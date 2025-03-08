@@ -1,0 +1,80 @@
+---
+- name: Manutenção Completa de Servidores Windows 🚀
+  hosts: servidores_windows
+  tasks:
+
+    - name: Limpeza de arquivos temporários e cache do sistema
+      win_shell: |
+        Remove-Item -Path "C:\Windows\Temp\*" -Force -Recurse -ErrorAction SilentlyContinue
+        Remove-Item -Path "$env:TEMP\*" -Force -Recurse -ErrorAction SilentlyContinue
+        Remove-Item -Path "C:\Windows\Prefetch\*" -Force -Recurse -ErrorAction SilentlyContinue
+      register: temp_cleanup
+
+    - name: Reset e limpeza do Windows Update
+      win_shell: |
+        Stop-Service -Name wuauserv -Force
+        Stop-Service -Name bits -Force
+        Remove-Item -Path "C:\Windows\SoftwareDistribution\*" -Recurse -Force
+        Remove-Item -Path "C:\Windows\System32\catroot2\*" -Recurse -Force
+        Start-Service -Name wuauserv
+        Start-Service -Name bits
+      register: update_reset
+
+    - name: Remover logs antigos do Windows e logs de eventos
+      win_shell: |
+        Get-ChildItem -Path "C:\Windows\Logs\*" -Include *.log -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+        wevtutil cl Application
+        wevtutil cl System
+        wevtutil cl Security
+      register: log_cleanup
+
+    - name: Verificação e reparo de integridade dos discos (chkdsk)
+      win_shell: chkdsk C: /F /R
+      args:
+        executable: cmd
+      register: chkdsk_result
+
+    - name: Verificação e reparo do sistema de arquivos (sfc /scannow)
+      win_shell: sfc /scannow
+      register: sfc_result
+
+    - name: Verificação e reparo de imagens do Windows (DISM)
+      win_shell: DISM /Online /Cleanup-Image /RestoreHealth
+      register: dism_result
+
+    - name: Otimização e desfragmentação dos discos
+      win_shell: Optimize-Volume -DriveLetter C -Defrag -Verbose
+      register: defrag_result
+
+    - name: Limpeza do cache de memória RAM
+      win_shell: |
+        Clear-PageFile -Confirm:$false
+        Write-Output "Memória cache do sistema foi limpa."
+      register: memory_cleanup
+
+    - name: Limpeza do cache DNS
+      win_shell: ipconfig /flushdns
+      register: dns_cleanup
+
+    - name: Remover pacotes do Windows Update não utilizados
+      win_shell: Dism.exe /online /Cleanup-Image /StartComponentCleanup
+      register: update_cleanup
+
+    - name: Reinicializar servidor se necessário (opcional)
+      win_reboot:
+        reboot_timeout: 600
+      when: "'Reboot required' in sfc_result.stdout or 'Reboot required' in dism_result.stdout"
+
+    - name: Exibir resultados das operações
+      debug:
+        msg:
+          - "🗑️ Arquivos temporários limpos: {{ temp_cleanup.stdout }}"
+          - "🔄 Windows Update resetado e cache limpo: {{ update_reset.stdout }}"
+          - "📜 Logs antigos removidos: {{ log_cleanup.stdout }}"
+          - "💾 Verificação de disco (chkdsk): {{ chkdsk_result.stdout }}"
+          - "🔍 Verificação do sistema (sfc): {{ sfc_result.stdout }}"
+          - "🛠️ Reparo de imagem do Windows (DISM): {{ dism_result.stdout }}"
+          - "🚀 Otimização de disco realizada: {{ defrag_result.stdout }}"
+          - "💡 Memória RAM liberada: {{ memory_cleanup.stdout }}"
+          - "🌐 Cache DNS limpo: {{ dns_cleanup.stdout }}"
+          - "📦 Pacotes antigos do Windows Update removidos: {{ update_cleanup.stdout }}"
