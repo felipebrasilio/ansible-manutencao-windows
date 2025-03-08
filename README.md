@@ -43,7 +43,7 @@ O que essa automação faz?
 
 ✅ Reinicia automaticamente o servidor, se necessário (opcional)
 
-==============================================================================================================
+====================================================================
 
 🚀 Automating Windows Server Maintenance with Ansible
 
